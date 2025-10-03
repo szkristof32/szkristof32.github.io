@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="hu">
+
+	<head>
+		<meta charset="utf-8" />
+		<title>Torlódási pontok</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<script src='https://cdn.plot.ly/plotly-3.1.0.min.js'></script>
+
+		<style>
+			* {
+				margin: 0;
+				padding: 0;
+				box-sizing: border-box;
+			}
+
+			body {
+				height: 100svh;
+			}
+		</style>
+	</head>
+
+	<body>
+		<div id="chart"></div>
+
+		<script>
+			const a = (n, R) => R * n * (1 - n);
+			const trace = {
+				x: [],
+				y: [],
+				mode: "markers",
+				type: "scatter"
+			}
+
+			for (let R = 0.0; R <= 4.0; R += 0.01) {
+				let a_n = 0.3;
+				for (let i = 0; i < 100000; i++)
+					a_n = a(a_n, R);
+
+				for (let i = 0; i < 80; i++) {
+					a_n = a(a_n, R);
+					const index = trace.y.findIndex((y) => Math.abs(y - a_n) <= 0.001);
+					if (index == -1 || trace.x[index] != R) {
+						trace.x.push(R);
+						trace.y.push(a_n);
+					}
+				}
+			}
+
+			Plotly.newPlot("chart", [trace]);
+		</script>
+	</body>
+
+</html>
