@@ -21,9 +21,11 @@
 	</head>
 
 	<body>
-		<div id="chart"></div>
+		<div id="chart">Betöltés...</div>
 
 		<script>
+			const chart = document.querySelector("#chart");
+
 			const a = (n, R) => R * n * (1 - n);
 			const trace = {
 				x: [],
@@ -32,22 +34,25 @@
 				type: "scatter"
 			}
 
-			for (let R = 0.0; R <= 4.0; R += 0.01) {
-				let a_n = 0.3;
-				for (let i = 0; i < 100000; i++)
-					a_n = a(a_n, R);
+			setTimeout(() => {
+				for (let R = 0.0; R <= 4.0; R += 0.01) {
+					let a_n = 0.3;
+					for (let i = 0; i < 100000; i++)
+						a_n = a(a_n, R);
 
-				for (let i = 0; i < 80; i++) {
-					a_n = a(a_n, R);
-					const index = trace.y.findIndex((y) => Math.abs(y - a_n) <= 0.001);
-					if (index == -1 || trace.x[index] != R) {
-						trace.x.push(R);
-						trace.y.push(a_n);
+					for (let i = 0; i < 80; i++) {
+						a_n = a(a_n, R);
+						const index = trace.y.findIndex((y) => Math.abs(y - a_n) <= 0.001);
+						if (index == -1 || trace.x[index] != R) {
+							trace.x.push(R);
+							trace.y.push(a_n);
+						}
 					}
 				}
-			}
 
-			Plotly.newPlot("chart", [trace]);
+				chart.innerHTML = "";
+				Plotly.newPlot("chart", [trace]);
+			}, 0);
 		</script>
 	</body>
 
