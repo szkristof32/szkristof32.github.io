@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="hu">
+
+	<head>
+		<meta charset="utf-8" />
+		<title>N-test probléma</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+		<script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+		<script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+
+		<style>
+			* {
+				margin: 0;
+				padding: 0;
+				box-sizing: border-box;
+			}
+
+			body {
+				height: 100svh;
+				overflow: hidden;
+			}
+
+			.panel {
+				position: fixed;
+				top: 100px;
+				right: 100px;
+				width: 300px;
+				background-color: whitesmoke;
+				font-family: system-ui;
+			}
+
+			.panel .title {
+				background-color: cadetblue;
+				padding: 5px;
+				user-select: none;
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+			}
+
+			.panel .title button {
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				width: 30px;
+				height: 30px;
+				cursor: pointer;
+			}
+
+			.panel .title button .icon {
+				display: flex;
+				align-items: center;
+				justify-content: center;
+			}
+
+			.panel .title button .icon.rotated {
+				rotate: 180deg;
+			}
+
+			.panel .content {
+				height: 640px;
+			}
+
+			.panel .content.hidden {
+				display: none;
+			}
+
+			.panel form .input {
+				margin: 10px;
+			}
+
+			.panel form input {
+				font-family: system-ui;
+			}
+		</style>
+	</head>
+
+	<body>
+		<canvas id="canvas"></canvas>
+
+		<div class="panel">
+			<h2 class="title">
+				Hozzáadás
+				<button>
+					<div class="icon">
+						<ion-icon name="chevron-down-outline"></ion-icon>
+					</div>
+				</button>
+			</h2>
+			<div class="content">
+				<form class="add-body" method="post" autocomplete="off">
+					<div class="input">
+						<label for="name">Név</label>
+						<input type="text" name="name" id="name" placeholder="Név" required />
+					</div>
+					<div class="input">
+						<label for="x">Pozíció</label>
+						<input type="number" name="x" id="x" placeholder="X" required />
+						<input type="number" name="y" id="y" placeholder="Y" required />
+						<button id="select-pos" type="button">Kijelölés</button>
+					</div>
+					<div class="input">
+						<label for="aX">Gyorsulás</label>
+						<input type="number" name="aX" id="aX" placeholder="aX" required />
+						<input type="number" name="aY" id="aY" placeholder="aY" required />
+						<button id="select-acc" type="button">Kijelölés</button>
+					</div>
+					<div class="input">
+						<label for="radius">Sugár</label>
+						<input type="number" name="radius" id="radius" placeholder="Sugár" required />
+					</div>
+					<div class="input">
+						<label for="mass">Tömeg</label>
+						<input type="number" name="mass" id="mass" placeholder="Tömeg" required />
+					</div>
+					<div class="input">
+						<label for="color">Szín</label>
+						<input type="color" name="color" id="color" value="#0000ff" required />
+					</div>
+
+					<div class="input">
+						<button type="submit">Hozzáadás</button>
+						<button type="reset">Reset</button>
+					</div>
+				</form>
+			</div>
+		</div>
+
+		<script>
+			const body = document.documentElement || document.body;
+			const canvas = document.querySelector("#canvas");
+			const context = canvas.getContext("2d");
+
+			const frameDelta = 1000.0 / 60.0;
+			const physicsDelta = 1000.0 / 60.0;
+
+			const G = 6.674e-11;
+
+			const panel = document.querySelector(".panel");
+			const panelButton = panel.querySelector(".title button");
+			const panelContent = panel.querySelector(".content");
+			const panelForm = panelContent.querySelector("form");
+			const selectPosButton = panelForm.querySelector("button#select-pos");
+			const selectAccButton = panelForm.querySelector("button#select-acc");
+
+			canvas.width = body.clientWidth;
+			canvas.height = body.clientHeight;
+
+			panelButton.addEventListener("click", () => {
+				panelContent.classList.toggle("hidden");
+				panelButton.querySelector(".icon").classList.toggle("rotated");
+			});
+			panelForm.addEventListener("submit", (e) => {
+				if (e.preventDefault)
+					e.preventDefault();
+
+				const form = panelForm;
+
+				const body = {
+					x: parseFloat(form.querySelector("#x").value),
+					y: parseFloat(form.querySelector("#y").value),
+					aX: parseFloat(form.querySelector("#aX").value),
+					aY: parseFloat(form.querySelector("#aY").value),
+					radius: form.querySelector("#radius").value,
+					mass: form.querySelector("#mass").value,
+					color: form.querySelector("#color").value,
+					name: form.querySelector("#name").value
+				};
+				bodies.push(body);
+				form.reset();
+			});
+			panelForm.addEventListener("reset", () => {
+				placeholderBody.x = 0;
+				placeholderBody.y = 0;
+				placeholderBody.radius = 0;
+				placeholderBody.name = "";
+			});
+			panelForm.querySelectorAll("input").forEach(i => i.addEventListener("change", (e) => {
+				placeholderBody[e.target.id] = e.target.value;
+			}));
+			selectPosButton.addEventListener("click", () => {
+				const button = selectPosButton;
+				if (button.classList.contains("pending")) {
+					button.classList.remove("pending");
+					return;
+				}
+
+				selectAccButton.classList.remove("pending");
+				button.classList.add("pending");
+			});
+			selectAccButton.addEventListener("click", () => {
+				const button = selectAccButton;
+				if (button.classList.contains("pending")) {
+					button.classList.remove("pending");
+					return;
+				}
+
+				selectPosButton.classList.remove("pending");
+				button.classList.add("pending");
+			});
+			canvas.addEventListener("mousemove", (e) => {
+				if (!selectPosButton.classList.contains("pending") && !selectAccButton.classList.contains("pending"))
+					return;
+
+				if (selectPosButton.classList.contains("pending")) {
+					const x = e.clientX;
+					const y = e.clientY;
+
+					panelForm.querySelector("#x").value = x;
+					panelForm.querySelector("#y").value = y;
+
+					placeholderBody.x = x;
+					placeholderBody.y = y;
+				}
+				else if (selectAccButton.classList.contains("pending")) {
+					const x = e.clientX - placeholderBody.x;
+					const y = e.clientY - placeholderBody.y;
+
+					panelForm.querySelector("#aX").value = x;
+					panelForm.querySelector("#aY").value = y;
+
+					placeholderBody.aX = x;
+					placeholderBody.aY = y;
+				}
+			});
+			canvas.addEventListener("click", (e) => {
+				if (!selectPosButton.classList.contains("pending") && !selectAccButton.classList.contains("pending"))
+					return;
+
+				if (selectPosButton.classList.contains("pending")) {
+					const x = e.clientX;
+					const y = e.clientY;
+
+					panelForm.querySelector("#x").value = x;
+					panelForm.querySelector("#y").value = y;
+
+					placeholderBody.x = x;
+					placeholderBody.y = y;
+
+					selectPosButton.classList.remove("pending");
+				}
+				else if (selectAccButton.classList.contains("pending")) {
+					const x = e.clientX - placeholderBody.x;
+					const y = e.clientY - placeholderBody.y;
+
+					panelForm.querySelector("#aX").value = x;
+					panelForm.querySelector("#aY").value = y;
+
+					placeholderBody.aX = x;
+					placeholderBody.aY = y;
+
+					selectAccButton.classList.remove("pending");
+				}
+			});
+
+			const bodies = [];
+			const placeholderBody = {
+				x: 0,
+				y: 0,
+				radius: 0,
+				color: "#0000ff",
+				name: ""
+			};
+
+			const clear = () => {
+				context.fillStyle = "black";
+				context.fillRect(0, 0, canvas.width, canvas.height);
+			}
+			const drawBody = (body) => {
+				context.fillStyle = body.color;
+				context.beginPath();
+				context.arc(body.x, body.y, body.radius, 0, 2 * Math.PI);
+				context.fill();
+
+				context.fillStyle = "black";
+				context.font = "32px system-ui";
+				context.textBaseline = "middle";
+				const name = context.measureText(body.name);
+				context.fillText(body.name, body.x - name.width / 2.0, body.y);
+			}
+			const render = () => {
+				clear();
+				bodies.forEach(body => drawBody(body));
+
+				drawBody(placeholderBody);
+
+				context.strokeStyle = placeholderBody.color;
+				context.lineWidth = 3;
+				context.beginPath();
+				context.moveTo(placeholderBody.x, placeholderBody.y);
+				context.lineTo(placeholderBody.x + placeholderBody.aX, placeholderBody.y + placeholderBody.aY);
+				context.stroke();
+				context.closePath();
+			}
+			setInterval(render, frameDelta);
+
+			const simulateBody = (body) => {
+				bodies.forEach(other => {
+					if (body == other)
+						return;
+
+					const distanceSquared = (other.x - body.x) ** 2 + (other.y - body.y) ** 2;
+					const distance = Math.sqrt(distanceSquared);
+					const forceDirX = (other.x - body.x) / distance;
+					const forceDirY = (other.y - body.y) / distance;
+
+					const force = G * body.mass * other.mass / distanceSquared;
+					const acc = force / body.mass;
+
+					body.aX += (other.x - body.x) * forceDirX / frameDelta;
+					body.aY += (other.y - body.y) * forceDirY / frameDelta;
+				});
+			}
+			const simulateBodies = () => {
+				bodies.forEach(body => simulateBody(body));
+				bodies.forEach(body => { body.x += body.aX / physicsDelta; body.y += body.aY / physicsDelta; });
+
+				const sunOffsetX = bodies[0].x - parseFloat(canvas.width / 2);
+				const sunOffsetY = bodies[0].y - parseFloat(canvas.height / 2);
+
+				bodies.forEach(body => { body.x -= sunOffsetX; body.y -= sunOffsetY });
+			}
+			setInterval(simulateBodies, physicsDelta);
+
+			const sun = {
+				x: parseFloat(canvas.width / 2),
+				y: parseFloat(canvas.height / 2),
+				aX: 0.0,
+				aY: 0.0,
+				radius: 100,
+				mass: 500,
+				color: "yellow",
+				name: "Nap"
+			}
+			bodies.push(sun);
+		</script>
+	</body>
+
+</html>
