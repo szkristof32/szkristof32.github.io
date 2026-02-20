@@ -60,18 +60,19 @@
 
 			.panel .content {
 				height: 640px;
+				padding: 10px;
 			}
 
 			.panel .content.hidden {
 				display: none;
 			}
 
-			.panel form .input {
-				margin: 10px;
-			}
-
 			.panel form input {
 				font-family: system-ui;
+			}
+
+			.panel .input {
+				margin-block: 10px;
 			}
 		</style>
 	</head>
@@ -81,7 +82,7 @@
 
 		<div class="panel">
 			<h2 class="title">
-				Hozzáadás
+				Beállítások
 				<button>
 					<div class="icon">
 						<ion-icon name="chevron-down-outline"></ion-icon>
@@ -89,10 +90,16 @@
 				</button>
 			</h2>
 			<div class="content">
+				<h3>Hozzáadás</h3>
+
 				<form class="add-body" method="post" autocomplete="off">
 					<div class="input">
 						<label for="name">Név</label>
 						<input type="text" name="name" id="name" placeholder="Név" required />
+					</div>
+					<div class="input">
+						<label for="radius">Sugár</label>
+						<input type="number" name="radius" id="radius" placeholder="Sugár" required />
 					</div>
 					<div class="input">
 						<label for="x">Pozíció</label>
@@ -107,12 +114,8 @@
 						<button id="select-acc" type="button">Kijelölés</button>
 					</div>
 					<div class="input">
-						<label for="radius">Sugár</label>
-						<input type="number" name="radius" id="radius" placeholder="Sugár" required />
-					</div>
-					<div class="input">
-						<label for="mass">Tömeg</label>
-						<input type="number" name="mass" id="mass" placeholder="Tömeg" required />
+						<label for="gravity">Felszíni gravitáció</label>
+						<input type="number" name="gravity" id="gravity" placeholder="Gravitáció" required />
 					</div>
 					<div class="input">
 						<label for="color">Szín</label>
@@ -124,6 +127,14 @@
 						<button type="reset">Reset</button>
 					</div>
 				</form>
+
+				<hr />
+
+				<div class="input">
+					<button id="toggle-sim">
+						Szimuláció indítása
+					</button>
+				</div>
 			</div>
 		</div>
 
@@ -132,10 +143,18 @@
 			const canvas = document.querySelector("#canvas");
 			const context = canvas.getContext("2d");
 
-			const frameDelta = 1000.0 / 60.0;
-			const physicsDelta = 1000.0 / 60.0;
+			const fps = 60.0;
+			const ups = 60.0;
 
-			const G = 6.674e-11;
+			const frameDeltaMs = 1000.0 / fps;
+			const physicsDeltaMs = 1000.0 / ups;
+
+			const frameDelta = frameDeltaMs / 1000.0;
+			const physicsDelta = physicsDeltaMs / 1000.0;
+
+			const G = 0.0005;
+
+			let simulationEnabled = false;
 
 			const panel = document.querySelector(".panel");
 			const panelButton = panel.querySelector(".title button");
@@ -143,6 +162,7 @@
 			const panelForm = panelContent.querySelector("form");
 			const selectPosButton = panelForm.querySelector("button#select-pos");
 			const selectAccButton = panelForm.querySelector("button#select-acc");
+			const toggleSimButton = panel.querySelector("#toggle-sim");
 
 			canvas.width = body.clientWidth;
 			canvas.height = body.clientHeight;
@@ -162,17 +182,20 @@
 					y: parseFloat(form.querySelector("#y").value),
 					aX: parseFloat(form.querySelector("#aX").value),
 					aY: parseFloat(form.querySelector("#aY").value),
-					radius: form.querySelector("#radius").value,
-					mass: form.querySelector("#mass").value,
+					radius: parseFloat(form.querySelector("#radius").value),
+					mass: 0.0,
 					color: form.querySelector("#color").value,
 					name: form.querySelector("#name").value
 				};
+				body.mass = getMass(body, parseFloat(form.querySelector("#gravity").value));
 				bodies.push(body);
 				form.reset();
 			});
 			panelForm.addEventListener("reset", () => {
 				placeholderBody.x = 0;
 				placeholderBody.y = 0;
+				placeholderBody.aX = 0;
+				placeholderBody.aY = 0;
 				placeholderBody.radius = 0;
 				placeholderBody.name = "";
 			});
@@ -253,6 +276,11 @@
 					selectAccButton.classList.remove("pending");
 				}
 			});
+			toggleSimButton.addEventListener("click", () => {
+				simulationEnabled = !simulationEnabled;
+
+				toggleSimButton.innerHTML = simulationEnabled ? "Szimuláció leállítása" : "Szimuláció indítása";
+			});
 
 			const bodies = [];
 			const placeholderBody = {
@@ -262,6 +290,10 @@
 				color: "#0000ff",
 				name: ""
 			};
+
+			const getMass = (body, gravity) => {
+				return gravity * body.radius * body.radius / G;
+			}
 
 			const clear = () => {
 				context.fillStyle = "black";
@@ -285,7 +317,7 @@
 
 				drawBody(placeholderBody);
 
-				context.strokeStyle = placeholderBody.color;
+				context.strokeStyle = "red";
 				context.lineWidth = 3;
 				context.beginPath();
 				context.moveTo(placeholderBody.x, placeholderBody.y);
@@ -293,7 +325,7 @@
 				context.stroke();
 				context.closePath();
 			}
-			setInterval(render, frameDelta);
+			setInterval(render, frameDeltaMs);
 
 			const simulateBody = (body) => {
 				bodies.forEach(other => {
@@ -308,20 +340,23 @@
 					const force = G * body.mass * other.mass / distanceSquared;
 					const acc = force / body.mass;
 
-					body.aX += (other.x - body.x) * forceDirX / frameDelta;
-					body.aY += (other.y - body.y) * forceDirY / frameDelta;
+					body.aX += acc * forceDirX * physicsDelta;
+					body.aY += acc * forceDirY * physicsDelta;
 				});
 			}
 			const simulateBodies = () => {
+				if (!simulationEnabled)
+					return;
+
 				bodies.forEach(body => simulateBody(body));
-				bodies.forEach(body => { body.x += body.aX / physicsDelta; body.y += body.aY / physicsDelta; });
+				bodies.forEach(body => { body.x += body.aX * physicsDelta; body.y += body.aY * physicsDelta; });
 
 				const sunOffsetX = bodies[0].x - parseFloat(canvas.width / 2);
 				const sunOffsetY = bodies[0].y - parseFloat(canvas.height / 2);
 
 				bodies.forEach(body => { body.x -= sunOffsetX; body.y -= sunOffsetY });
 			}
-			setInterval(simulateBodies, physicsDelta);
+			setInterval(simulateBodies, frameDeltaMs);
 
 			const sun = {
 				x: parseFloat(canvas.width / 2),
@@ -329,10 +364,11 @@
 				aX: 0.0,
 				aY: 0.0,
 				radius: 100,
-				mass: 500,
+				mass: 0,
 				color: "yellow",
 				name: "Nap"
-			}
+			};
+			sun.mass = getMass(sun, 270.0);
 			bodies.push(sun);
 		</script>
 	</body>
